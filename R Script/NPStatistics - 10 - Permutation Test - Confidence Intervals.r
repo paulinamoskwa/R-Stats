@@ -1,0 +1,36 @@
+###########################################################################################
+###                                  PERMUTATION TEST                                   ###
+###                                Confidence Intervals                                 ###
+###########################################################################################
+seed  = 100
+B     = 1000
+alpha = 0.1
+
+### Univariate CI for t-test (mean)
+data = cars
+data = data[,1]    # make sure it to be a vector
+uni_t_perm = function(data, mu0, B=1000){
+  data_trans = data-mu0
+  T0         = abs(mean(data_trans))
+  T_perm     = numeric(B)
+  n          = length(data)
+  for(k in 1:B){
+    refl      = rbinom(n, 1, 0.5)*2 -1
+    T_perm[k] = abs(mean(data_trans*refl))
+  }
+  return (sum(T_perm>=T0)/B)
+}
+
+library(pbapply)
+library(parallel)
+# Remember to always adjust the grid!
+grid = seq(0, 25, length.out =100)
+cl   = makeCluster(2)
+clusterExport(cl, varlist=list("data", "uni_t_perm"))
+
+perm_wrap     = function(grid_point){uni_t_perm(data, grid_point, B=1000)}
+pval_function = pbsapply(grid, perm_wrap, cl=cl)
+plot(grid, pval_function, type='l')
+abline(h=alpha, col='red')
+abline(v=range(grid[pval_function>alpha]), col='red')
+range(grid[pval_function>alpha])

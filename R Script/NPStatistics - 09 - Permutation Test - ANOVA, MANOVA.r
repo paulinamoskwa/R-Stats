@@ -1,0 +1,215 @@
+###########################################################################################
+###                                  PERMUTATION TEST                                   ###
+###                                        ANOVA                                        ###
+###########################################################################################
+seed = 100
+B    = 1000
+
+# We can always start from the parametric ANOVA/MANOVA. The assumptions hold either:
+#  * each group is normally distributed and the variance is equal among groups
+#  * the residuals are normally distributed
+
+### ---------------------------------------------------------------------------------------
+### One-way ANOVA (p=1, g=6) 
+### ---------------------------------------------------------------------------------------
+###    H0: X1 =^d .. =^d XG == all the observations belong to the same population
+###    H1: exists i,j: Xi !=^d Xj
+### Test statistic: from the parametric case 
+data     = chickwts                   # data = [values, levels]  (check the levels to be factors)
+data[,2] = as.factor(data[,2])
+n        = dim(data)[1]
+g        = nlevels(data[,2])
+plot(data[,2], data[,1])
+
+x      = data[,1]
+levels = data[,2]
+
+fit = aov(x ~ levels)
+summary(fit)
+T0  = summary.aov(fit)[[1]][1,4]
+T0
+
+# CMC to estimate the p-value
+set.seed(seed)
+T_stat = numeric(B)
+for(k in 1:B){
+  perm      = sample(1:n)
+  x_perm    = x[perm]
+  fit_perm  = aov(x_perm ~ levels)
+  T_stat[k] = summary.aov(fit_perm)[[1]][1,4]
+}
+
+# Permutational distribution of T
+par(mfrow=c(1,2))
+hist(T_stat, xlim=range(c(T_stat,T0)), breaks=30)
+abline(v=T0, col=3, lwd=2)
+plot(ecdf(T_stat), xlim=range(c(T_stat,T0)))
+abline(v=T0, col=3, lwd=2)
+
+# p-value
+p_value = sum(T_stat>=T0)/B
+p_value
+
+### ---------------------------------------------------------------------------------------
+### Two-way ANOVA (p=1, g=2, b=2)
+### ---------------------------------------------------------------------------------------
+###    H0: X1 =^d .. =^d XG == all the observations belong to the same population
+###    H1: exists i,j: Xi !=^d Xj (on at least one of the two factors)
+### Test statistic: from the parametric case 
+data     = ToothGrowth                # data = [values, level1, level2]  (check the levels to be factors)
+data[,2] = as.factor(data[,2])
+data[,3] = as.factor(data[,3])
+n        = dim(data)[1]
+g        = nlevels(data[,2])
+b        = nlevels(data[,3])
+
+par(mfrow=c(1,2))
+plot(data[,2], data[,1])
+plot(data[,3], data[,1])
+table(data[,2], data[,3])
+
+x   = data[,1]
+lv1 = data[,2]
+lv2 = data[,3]
+
+### |---------------------------------|
+### | Test 1: test on the interaction | 
+### |---------------------------------|
+fit_1 = aov(x ~ lv1 + lv2 + lv1:lv2)
+summary.aov(fit_1)
+T0_1  = summary.aov(fit_1)[[1]][3,4]
+T0_1
+
+# CMC to estimate the p-value
+# The idea is to permute the residuals under H0
+set.seed(seed)
+fit_1_H0 = aov(x ~ lv1 + lv2)
+res_1    = fit_1_H0$residuals
+T_stat_1 = numeric(B)
+for(k in 1:B){
+  perm        = sample(1:n)
+  res_1_perm  = res_1[perm]
+  x_1_perm    = fit_1_H0$fitted.values + res_1_perm
+  fit_1_perm  = aov(x_1_perm ~ lv1 + lv2 + lv1:lv2)
+  T_stat_1[k] = summary(fit_1_perm)[[1]][3,4]
+}
+
+# Permutational distribution of T
+par(mfrow=c(1,2))
+hist(T_stat_1, xlim=range(c(T_stat_1,T0_1)), breaks=30)
+abline(v=T0_1, col=3, lwd=2)
+plot(ecdf(T_stat_1), xlim=range(c(T_stat_1,T0_1)))
+abline(v=T0_1, col=3, lwd=2)
+
+# p-value
+p_value = sum(T_stat_1>=T0_1)/B
+p_value
+
+### |-----------------------------------------------------------|
+### | Test 2: test on lv2 without interaction (considering lv1) |
+### |-----------------------------------------------------------|
+fit_2 = aov(x ~ lv1 + lv2)
+summary.aov(fit_2)
+T0_2  = summary.aov(fit_2)[[1]][2,4]
+T0_2
+
+# CMC to estimate the p-value
+# The idea is to permute the residuals under H0
+set.seed(seed)
+fit_2_H0 = aov(x ~ lv1)
+res_2    = fit_2_H0$residuals
+T_stat_2 = numeric(B)
+for(k in 1:B){
+  perm        = sample(1:n)
+  res_2_perm  = res_2[perm]
+  x_2_perm    = fit_2_H0$fitted.values + res_2_perm
+  fit_2_perm  = aov(x_2_perm ~ lv1 + lv2)
+  T_stat_2[k] = summary(fit_2_perm)[[1]][2,4]
+}
+
+# Permutational distribution of T
+par(mfrow=c(1,2))
+hist(T_stat_2, xlim=range(c(T_stat_2,T0_2)), breaks=30)
+abline(v=T0_2, col=3, lwd=2)
+plot(ecdf(T_stat_2), xlim=range(c(T_stat_2,T0_2)))
+abline(v=T0_2, col=3, lwd=2)
+
+# p-value
+p_value = sum(T_stat_2>=T0_2)/B
+p_value
+
+### |-----------------------------------------------------------|
+### | Test 3: test on lv1 without interaction (considering lv2) |
+### |-----------------------------------------------------------|
+fit_3 = aov(x ~ lv1 + lv2)
+summary.aov(fit_3)
+T0_3  = summary.aov(fit_3)[[1]][1,4]
+T0_3
+
+# CMC to estimate the p-value
+# The idea is to permute the residuals under H0
+set.seed(seed)
+fit_3_H0 = aov(x ~ lv2)
+res_3    = fit_3_H0$residuals
+T_stat_3 = numeric(B)
+for(k in 1:B){
+  perm        = sample(1:n)
+  res_3_perm  = res_3[perm]
+  x_3_perm    = fit_3_H0$fitted.values + res_3_perm
+  fit_3_perm  = aov(x_3_perm ~ lv1 + lv2)
+  T_stat_3[k] = summary(fit_3_perm)[[1]][1,4]
+}
+
+# Permutational distribution of T
+par(mfrow=c(1,2))
+hist(T_stat_3, xlim=range(c(T_stat_3,T0_3)), breaks=30)
+abline(v=T0_3, col=3, lwd=2)
+plot(ecdf(T_stat_3), xlim=range(c(T_stat_3,T0_3)))
+abline(v=T0_3, col=3, lwd=2)
+
+# p-value
+p_value = sum(T_stat_3>=T0_3)/B
+p_value
+
+### Other tests: with the same policy we can also perform
+### Test 4: test on lv1 *and* lv2 (H0: both *not* relevant)
+### Test 5: test on lv1/lv2 without the other level (H0: lv* *not* relevant)
+
+### ---------------------------------------------------------------------------------------
+### One-way MANOVA (p=4, g=6) 
+### ---------------------------------------------------------------------------------------
+###    H0: X1 =^d .. =^d XG == all the observations belong to the same population
+###    H1: exists i,j: Xi !=^d Xj
+### Test statistic: from the parametric case
+data   = iris              # data = [values_1, .., values_p, levels]  (check the levels to be factors)
+x      = data[,1:4]
+levels = data[,5]
+n      = dim(data)[1]
+p      = dim(x)[2]
+g      = nlevels(levels)
+
+fit = manova(as.matrix(x) ~ levels)
+summary.manova(fit, test="Wilks")
+T0  = -summary.manova(fit, test="Wilks")$stats[1,2]
+T0
+
+# CMC to estimate the p-value
+set.seed(seed)
+T_stat = numeric(B)
+for(k in 1:B){
+  perm        = sample(1:n)
+  levels_perm = levels[perm]
+  fit_perm    = manova(as.matrix(x) ~ levels_perm)
+  T_stat[k]   = -summary.manova(fit_perm, test="Wilks")$stat[1,2]
+}
+
+# Permutational distribution of T
+par(mfrow=c(1,2))
+hist(T_stat, xlim=range(c(T_stat,T0)), breaks=30)
+abline(v=T0, col=3, lwd=2)
+plot(ecdf(T_stat), xlim=range(c(T_stat,T0)))
+abline(v=T0, col=3, lwd=2)
+
+# p-value
+p_value = sum(T_stat>=T0)/B
+p_value

@@ -1,0 +1,205 @@
+---
+title: ''
+output: html_document
+---
+
+# 📊 **GAMs**
+
+```{r, warning=FALSE, message=FALSE}
+seed  = 100
+B     = 1000
+alpha = 0.1
+```
+
+## **1.** GAMs given orders
+```{r, warning=FALSE, message=FALSE}
+library(gam) # (not the best library)
+# data = [x1, .., xp, y]
+load('nlr_data.rda')
+data  = data.frame("year"=Wage$year, "age"=Wage$age, "wage"=Wage$wage)
+x1    = data[,1]
+x2    = data[,2]
+y     = data[,3]
+gam_m = gam(y ~ s(x1,1) + s(x2,1))
+# we can modify the degree of smoothness for each term
+summary(gam_m)
+par(mfrow=c(1,2))
+plot(gam_m)
+
+x1_grid     = seq(range(x1)[1], range(x1)[2], length.out=100)
+x2_grid     = seq(range(x2)[1], range(x2)[2], length.out=100)
+grid        = expand.grid(x1_grid, x2_grid)
+names(grid) = c('x1', 'x2')
+pred        = predict(gam_m, newdata=grid)
+
+library(plot3D)
+#persp3D(z=pred, theta=120)
+
+library(rgl)
+#persp3d(x1_grid, x2_grid, pred, col='yellow')
+#points3d(x1, x2, y, col='black', size=5)
+```
+
+## **2.** Cubic Regression Splines
+```{r, warning=FALSE, message=FALSE}
+library(mgcv)
+# data = [x1, .., xp, y]
+load('nlr_data.rda')
+data = as.data.frame(cbind("education"=Prestige$education, 
+                           "income"   =Prestige$income, 
+                           "prestige" =Prestige$prestige))
+x1    = data[,1]
+x2    = data[,2]
+y     = data[,3]
+gam_m = gam(y ~ s(x1, bs='cr') + s(x2, bs='cr'))
+#gam_m = gam(y ~ s(x1, bs='cr') + s(x2, bs='cr',k=7))  # we can also decide #knots (k)
+summary(gam_m)
+par(mfrow=c(1,2))
+plot(gam_m)
+hist(gam_m$residuals)
+qqnorm(gam_m$residuals)
+shapiro.test(gam_m$residuals)
+
+library(rgl)
+x1_grid     = seq(range(x1)[1], range(x1)[2], length.out=100)
+x2_grid     = seq(range(x2)[1], range(x2)[2], length.out=100)
+grid        = expand.grid(x1_grid, x2_grid)
+names(grid) = c('x1', 'x2')
+pred        = predict(gam_m, newdata=grid)
+#persp3d(x1_grid, x2_grid, pred, col='yellow')
+#points3d(x1, x2, y, col='black', size=5)
+```
+
+## **3.** Cubic Regression Splines with interaction
+```{r, warning=FALSE, message=FALSE}
+### |---------------|
+### | Cubic Splines |
+### |---------------|
+inter = x1*x2
+gam_m = gam(y ~ s(x1, bs='cr') + s(x2, bs='cr') + s(I(inter), bs='cr'))
+summary(gam_m)
+```
+
+```{r, warning=FALSE, message=FALSE}
+par(mfrow=c(1,2))
+plot(gam_m)
+```
+
+```{r, warning=FALSE, message=FALSE}
+par(mfrow=c(1,2))
+hist(gam_m$residuals)
+qqnorm(gam_m$residuals)
+shapiro.test(gam_m$residuals)
+
+library(rgl)
+x1_grid     = seq(range(x1)[1], range(x1)[2], length.out=100)
+x2_grid     = seq(range(x2)[1], range(x2)[2], length.out=100)
+grid        = expand.grid(x1_grid, x2_grid)
+names(grid) = c('x1', 'x2')
+pred        = predict(gam_m, newdata=data.frame(grid, inter=grid$x1*grid$x1))
+#persp3d(x1_grid, x2_grid, pred, col='yellow')
+#points3d(x1, x2, y, col='black', size=5)
+
+### |--------------------|
+### | Thin Plate Splines |
+### |--------------------|
+gam_m = gam(y ~ s(x1, bs='cr') + s(x2, bs='cr') + s(x1, x2, bs='tp'))
+summary(gam_m)
+par(mfrow=c(1,2))
+plot(gam_m)
+```
+
+```{r, warning=FALSE, message=FALSE}
+par(mfrow=c(1,2))
+hist(gam_m$residuals)
+qqnorm(gam_m$residuals)
+shapiro.test(gam_m$residuals)
+
+library(rgl)
+x1_grid     = seq(range(x1)[1], range(x1)[2], length.out=100)
+x2_grid     = seq(range(x2)[1], range(x2)[2], length.out=100)
+grid        = expand.grid(x1_grid, x2_grid)
+names(grid) = c('x1', 'x2')
+pred        = predict(gam_m, newdata=data.frame(grid))
+#persp3d(x1_grid, x2_grid, pred, col='yellow')
+#points3d(x1, x2, y, col='black', size=5)
+
+### ---------------------------------------------------------------------------------------
+### Normal residuals - CI & Prediction
+### ---------------------------------------------------------------------------------------
+# Prediction 
+newdata = data.frame(x1=15, x2=15000)
+pred    = predict(gam_m, newdata=newdata, type='response', se.fit=T)            
+
+# Confidence Intervals
+lwr = pred$fit-pred$se.fit*qt(1-(alpha/2), nrow(data))
+lvl = pred$fit
+upr = pred$fit+pred$se.fit*qt(1-(alpha/2), nrow(data))
+cbind(lwr, lvl, upr)
+
+### ---------------------------------------------------------------------------------------
+### *NOT* normal residuals - Bootstrap CI & Prediction
+### ---------------------------------------------------------------------------------------
+set.seed(seed)
+newdata    = data.frame(x1=15, x2=15000)
+fitted_obs = gam_m$fitted.values
+res_obs    = gam_m$residuals
+pred_obs   = predict(gam_m, newdata=newdata)
+
+pred_boot = numeric(B)
+for(k in 1:B){
+  y_boot       = fitted_obs + sample(res_obs, replace=T)
+  gam_m_boot   = gam(y_boot ~ s(x1, bs='cr') + s(x2, bs='cr') + s(x1, x2, bs='tp'))
+  pred_boot[k] = predict(gam_m_boot, newdata=newdata) 
+}
+
+right_quantile = quantile(pred_boot, 1-alpha/2)
+left_quantile  = quantile(pred_boot, alpha/2)
+CI_boot = c(pred_obs-(right_quantile-pred_obs), pred_obs, pred_obs-(left_quantile-pred_obs))
+CI_boot
+
+### ---------------------------------------------------------------------------------------
+### *NOT* normal residuals - Permutation test for coefficient 
+### ---------------------------------------------------------------------------------------
+# Test for the interaction
+T0 = abs(summary(gam_m)$s.table[3,3])
+gam_H0 = gam(y ~ s(x1, bs='cr') + s(x2, bs='cr'))
+res_H0 = gam_H0$residuals
+n      = nrow(data)
+
+set.seed(seed)
+T_stat = numeric(B)
+for(k in 1:B){
+  perm        = sample(nrow(data))
+  res_H0_perm = res_H0[perm]
+  y_perm      = gam_H0$fitted.values + res_H0_perm
+  gam_perm    = gam(y_perm ~ s(x1, bs='cr') + s(x2, bs='cr') + s(x1, x2, bs='tp'))
+  T_stat[k]   = abs(summary(gam_perm)$s.table[3,3])
+}
+
+par(mfrow=c(1,2))
+hist(T_stat)
+abline(v=T0, lty=2, col='red')
+plot(ecdf(T_stat))
+abline(v=T0, lty=2, col='red')
+
+p_value = sum(T_stat>=T0)/B
+p_value
+```
+
+## **4.** Cubic Splines for a probability model (dummy_var = I_{y>val})
+```{r, warning=FALSE, message=FALSE}
+val       = 20
+gam_logit = gam(I(y>val) ~ s(x1,bs='cr') + s(x2,bs='cr'), family='binomial')
+
+library(rgl)
+x1_grid     = seq(range(x1)[1], range(x1)[2], length.out=100)
+x2_grid     = seq(range(x2)[1], range(x2)[2], length.out=100)
+grid        = expand.grid(x1_grid, x2_grid)
+names(grid) = c('x1', 'x2')
+preds       = predict(gam_logit, newdata=grid)
+pfit        = exp(preds)/(1+exp(preds))
+#persp3d(x1_grid, x2_grid, pfit, col='yellow')
+#points3d(x1, x2, I(y>val), col='black', size=5)
+```
+

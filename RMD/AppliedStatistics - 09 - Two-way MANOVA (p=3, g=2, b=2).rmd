@@ -1,0 +1,216 @@
+---
+title: ''
+output: html_document
+---
+
+# 📈 **Two-way MANOVA (p=3, g=2, b=2)**
+
+## **0.** Settings
+```{r, warning=FALSE, message=FALSE}
+load("mcshapiro.test.RData")
+```
+
+## **1.** Data
+```{r, warning=FALSE, message=FALSE}
+data = read.table('T6-4.dat', col.names=c('Ex','Ad','Tr','Gl','Op'))
+```
+
+## **2.** Exploration
+```{r, warning=FALSE, message=FALSE}
+head(data)
+p = dim(data)[2] - 2
+v = 'X1'
+
+# Re-name
+for(i in 2:p){
+  v = c(v, paste('X', i, sep=''))
+}
+colnames(data) = c('label_1','label_2', v)
+head(data)
+
+Label_1 = factor(data$label_1, labels=c('L','H')) # Treat.1
+Label_2 = factor(data$label_2, labels=c('L','H')) # Treat.2
+Label_1_2 = Label_1
+levels(Label_1_2) <- c('LL','LH','HL','HH')
+Label_1_2[Label_1=='L' & Label_2=='L'] <- 'LL'
+Label_1_2[Label_1=='L' & Label_2=='H'] <- 'LH'
+Label_1_2[Label_1=='H' & Label_2=='L'] <- 'HL'
+Label_1_2[Label_1=='H' & Label_2=='H'] <- 'HH'
+data.feats = data[,3:(2+p)]
+
+## Graphical exploration of the data
+
+# Effect of the treatments + their interaction on the FIRST variable
+layout(matrix(c(1,1,2,3), 2, byrow=T))
+boxplot(data.feats[,1]~Label_1_2, main='With Interac. lab_1+lab_2',ylab='Tr', col='grey95')
+boxplot(data.feats[,1]~Label_1, main='Only lab_1', ylab='Tr',col=c('red','blue'))
+boxplot(data.feats[,1]~Label_2, main='Only lab_2', ylab='Tr',col=c('forestgreen','gold'))
+
+# Effect of the treatments + their interaction on the SECOND variable
+layout(matrix(c(1,1,2,3), 2, byrow=T))
+boxplot(data.feats[,2]~Label_1_2, main='With Interac. lab_1+lab_2',ylab='Tr',col='grey95')
+boxplot(data.feats[,2]~Label_1, main='Only lab_1', ylab='Tr',col=c('red','blue'))
+boxplot(data.feats[,2]~Label_2, main='Only lab_2', ylab='Tr',col=c('forestgreen','gold'))
+
+# Effect of the treatments + their interaction on the THIRD variable
+layout(matrix(c(1,1,2,3), 2, byrow=T))
+boxplot(data.feats[,3]~Label_1_2, main='With Interac. lab_1+lab_2',ylab='Tr', col='grey95')
+boxplot(data.feats[,3]~Label_1, main='Only lab_1', ylab='Tr',col=c('red','blue'))
+boxplot(data.feats[,3]~Label_2, main='Only lab_2', ylab='Tr',col=c('forestgreen','gold'))
+```
+
+## **3.** Model
+```{r, warning=FALSE, message=FALSE}
+# Note that: if we have to remove rows -> one at the time
+
+# Assumptions
+# 1) Gaussianity
+treat = levels(Label_1_2)
+Ps = 0*(1:length(treat))
+for(i in 1:length(treat)){
+  Ps[i] = mcshapiro.test(data.feats[Label_1_2==levels(Label_1_2)[i],])$p
+}
+Ps
+
+# 2) homogeneity of the covariance (qualitatively)
+S1 = cov(data.feats[Label_1_2==levels(Label_1_2)[1], ])
+S2 = cov(data.feats[Label_1_2==levels(Label_1_2)[2], ])
+S3 = cov(data.feats[Label_1_2==levels(Label_1_2)[3], ])
+S4 = cov(data.feats[Label_1_2==levels(Label_1_2)[4], ])
+
+par(mfrow=c(1,4))
+image(S1, col=heat.colors(100),main='Cov. S1', asp=1, axes = FALSE,
+      breaks = quantile(rbind(S1,S2,S3,S4), (0:100)/100, na.rm=TRUE))
+image(S2, col=heat.colors(100),main='Cov. S2', asp=1, axes = FALSE,
+      breaks = quantile(rbind(S1,S2,S3,S4), (0:100)/100, na.rm=TRUE))
+image(S3, col=heat.colors(100),main='Cov. S3', asp=1, axes = FALSE,
+      breaks = quantile(rbind(S1,S2,S3,S4), (0:100)/100, na.rm=TRUE))
+image(S4, col=heat.colors(100),main='Cov. S4', asp=1, axes = FALSE,
+      breaks = quantile(rbind(S1,S2,S3,S4), (0:100)/100, na.rm=TRUE))
+
+###------------------------------
+### Complete model
+###------------------------------
+# measure.ijk = mu + tau.i + beta.j + gamma.ij + eps.ijk eps.ijk ~ N(0, sigma^2)
+# i=1,2 (label_1)
+# j=1,2 (label_2)
+
+fit2.int = manova(as.matrix(data.feats) ~ Label_1 + Label_2 + Label_1:Label_2)
+summary.manova(fit2.int, test="Wilks")
+
+###------------------------------
+### Additive model
+###------------------------------
+# measure.ijk = mu + tau.i + beta.j + eps.ijk eps.ijk ~ N(0, sigma^2)
+# i=1,2 (label_1)
+# j=1,2 (label_2)
+
+fit2.ad = manova(as.matrix(data.feats) ~ Label_1 + Label_2)
+summary.manova(fit2.ad, test="Wilks")
+```
+
+## **4.** Which supplement is responsible?
+```{r, warning=FALSE, message=FALSE}
+# First of all:
+#   Let's see on which variables the group has an effect.
+#   Via ANOVA: for each feature we perform an ANOVA to see if the belonging to
+#   the group has an effect on the mean of the variables.
+summary.aov(fit2.ad)
+
+# Comment
+# Pr(>F) = p-value small -> the group has an influence on that X_k
+# This analysis does NOT say either which groups differ nor which are the variables
+# for which the groups differ. 
+
+## Bonferroni CI
+#  We want to know the level (of the labels) that introduces the difference.
+
+alpha = 0.05
+g = 2
+b = 2
+n = 5 # number of unities for each label label_1[i], label_2[j]
+
+# Let's suppose a symmetric design
+N = n*g*b
+W = summary.manova(fit2.ad)$SS$Residuals
+
+# How many comparisons?
+k = g*(g-1)/2*p + b*(b-1)/2*p
+# because we have: g levels on the first treatment on p components
+# b levels on the second treatment on p components
+k
+
+qT = qt(1 - alpha / (2 * k), g*b*n-g-b+1)
+
+# The degrees of freedon of the residuals on the additive model are g*b*n-g-b+1
+mExL  = sapply(data.feats[Label_1=='L',],mean)
+mExH  = sapply(data.feats[Label_1=='H',],mean)
+infEx = mExH-mExL - qT * sqrt( diag(W)/(g*b*n-g-b+1) * (1/10+1/10) )
+supEx = mExH-mExL + qT * sqrt( diag(W)/(g*b*n-g-b+1) * (1/10+1/10) )
+mAdL  = sapply(data.feats[Label_2=='L',],mean)
+mAdH  = sapply(data.feats[Label_2=='H',],mean)
+infAd = mAdH-mAdL - qT * sqrt( diag(W)/(g*b*n-g-b+1) * (1/10+1/10) )
+supAd = mAdH-mAdL + qT * sqrt( diag(W)/(g*b*n-g-b+1) * (1/10+1/10) )
+IC2   = list(lab1.H_lab1.L=cbind(infEx, supEx), lab2.H_lab2.L=cbind(infAd, supAd))
+IC2
+
+# Advanced Plot
+Ex = Label_1
+Ad = Label_2
+plastic3 = data.feats
+par(mfrow=c(3,4))
+boxplot(plastic3[,1]~Ex, main='Fact.: Extrusion (Tear Resistance)' ,
+        ylab='Tr', col=rainbow(2*6)[c(1,2)], ylim=c(-2,10))
+plot(c(1,g*(g-1)/2),range(IC2[[1]][1,]), pch='',main='IC (tau.1-tau.2)[1]',
+     xlab='pairs treat', ylab='IC (tau.1-tau.2)[1]', ylim=c(-2,10))
+lines(c(1,1), c(IC2[[1]][1,1],IC2[[1]][1,2]), col='grey55');
+points(1, (mExH-mExL)[1], pch=16, col='grey55');
+points(1, IC2[[1]][1,1], col=rainbow(2*6)[1], pch=16);
+points(1, IC2[[1]][1,2], col=rainbow(2*6)[2], pch=16);
+abline(h=0)
+boxplot(plastic3[,1]~Ad, main='Fact.: Additive (Tear Resistance)' ,
+        ylab='Tr', col=rainbow(2*6)[c(7,8)], ylim=c(-2,10))
+plot(c(1,g*(g-1)/2),range(IC2[[2]][1,]), pch='',main='IC (beta.1-beta.2)[1]',
+     xlab='pairs treat', ylab='IC (beta.1-beta.2)[1]', ylim=c(-2,10))
+lines(c(1,1), c(IC2[[2]][1,1],IC2[[2]][1,2]), col='grey55');
+points(1, (mAdH-mAdL)[1], pch=16, col='grey55');
+points(1, IC2[[2]][1,1], col=rainbow(2*6)[7], pch=16);
+points(1, IC2[[2]][1,2], col=rainbow(2*6)[8], pch=16);
+abline(h=0)
+boxplot(plastic3[,2]~Ex, main='Fact.: Extrusion (Gloss)' , ylab='Gl',
+        col=rainbow(2*6)[c(3,4)], ylim=c(-2,10))
+plot(c(1,g*(g-1)/2),range(IC2[[1]][2,]), pch='',main='IC (tau.1-tau.2)[2]',
+     xlab='pairs treat', ylab='IC (tau.1-tau.2)[2]', ylim=c(-2,10))
+lines(c(1,1), c(IC2[[1]][2,1],IC2[[1]][2,2]), col='grey55');
+points(1, (mExH-mExL)[2], pch=16, col='grey55');
+points(1, IC2[[1]][2,1], col=rainbow(2*6)[3], pch=16);
+points(1, IC2[[1]][2,2], col=rainbow(2*6)[4], pch=16);
+abline(h=0)
+boxplot(plastic3[,2]~Ex, main='Fact.: Additive (Gloss)' , ylab='Gl',
+        col=rainbow(2*6)[c(9,10)], ylim=c(-2,10))
+plot(c(1,g*(g-1)/2),range(IC2[[2]][2,]), pch='',main='IC (beta.1-beta.2)[2]',
+     xlab='pairs treat', ylab='IC (beta.1-beta.2)[2]', ylim=c(-2,10))
+lines(c(1,1), c(IC2[[2]][2,1],IC2[[2]][2,2]), col='grey55');
+points(1, (mAdH-mAdL)[2], pch=16, col='grey55');
+points(1, IC2[[2]][2,1], col=rainbow(2*6)[9], pch=16);
+points(1, IC2[[2]][2,2], col=rainbow(2*6)[10], pch=16);
+abline(h=0)
+boxplot(plastic3[,3]~Ex, main='Fact.: Extrusion (Opacity)' , ylab='Op',
+        col=rainbow(2*6)[c(5,6)], ylim=c(-2,10))
+plot(c(1,g*(g-1)/2),range(IC2[[1]][3,]), pch='',main='IC (tau.1-tau.2)[3]',
+     xlab='pairs treat', ylab='IC (tau.1-tau.2)[3]', ylim=c(-2,10))
+lines(c(1,1), c(IC2[[1]][3,1],IC2[[1]][3,2]), col='grey55');
+points(1, (mExH-mExL)[3], pch=16, col='grey55');
+points(1, IC2[[1]][3,1], col=rainbow(2*6)[5], pch=16);
+points(1, IC2[[1]][3,2], col=rainbow(2*6)[6], pch=16);
+abline(h=0)
+boxplot(plastic3[,3]~Ex, main='Only Factor Additive (Opacity)' , ylab='Op',
+        col=rainbow(2*6)[c(11,12)], ylim=c(-2,10))
+plot(c(1,g*(g-1)/2),range(IC2[[2]][3,]), pch='',main='IC (beta.1-beta.2)[3]',
+     xlab='pairs treat', ylab='IC beta.1[3]', ylim=c(-2,10))
+lines(c(1,1), c(IC2[[2]][3,1],IC2[[2]][3,2]), col='grey55');
+points(1, (mAdH-mAdL)[3], pch=16, col='grey55');
+points(1, IC2[[2]][3,1], col=rainbow(2*6)[11], pch=16);
+points(1, IC2[[2]][3,2], col=rainbow(2*6)[12], pch=16);
+abline(h=0)
+```

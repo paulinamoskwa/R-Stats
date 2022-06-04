@@ -1,0 +1,37 @@
+###########################################################################################
+###                                      BOOTSTRAP                                      ###
+###                             Two independent samples (1-dim)                         ###
+###########################################################################################
+seed  = 100
+B     = 1000
+alpha = 0.1
+
+grades = read.table('parziali.txt', header=T)
+gender = read.table('sesso.txt', header=T)
+data_1 = grades[gender==1,'PI']
+data_2 = grades[gender==0,'PI']
+
+par(mfrow=c(1,2))
+boxplot(data_1, ylim=range(c(data_1,data_2)))
+boxplot(data_2, ylim=range(c(data_1,data_2)))
+
+# Bootstrap for medians
+T0 = quantile(data_1, 0.5) - quantile(data_2, 0.5)
+
+set.seed(seed)
+T_boot = numeric(B)
+for(k in 1:B){
+  data_1_boot = sample(data_1, replace=T)
+  data_2_boot = sample(data_2, replace=T)
+  T_boot[k]   = quantile(data_1_boot, 0.5) - quantile(data_2_boot, 0.5)
+}
+
+par(mfrow=c(1,1))
+plot(ecdf(T_boot))
+abline(v=T0, lty=2)
+
+right_quantile = quantile(T_boot, 1-alpha/2)
+left_quantile  = quantile(T_boot, alpha/2)
+CI_med = c(T0-(right_quantile-T0), T0, T0-(left_quantile-T0))
+CI_med
+abline(v=CI_med[c(1,3)], col='red')

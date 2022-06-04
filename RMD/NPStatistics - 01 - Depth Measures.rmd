@@ -1,0 +1,103 @@
+---
+title: ''
+output: html_document
+---
+
+# 📊 **Depth Measures**
+
+```{r, warning=FALSE, message=FALSE}
+library(MASS)
+library(rgl)
+library(DepthProc)
+library(hexbin)
+#library(depth) # if "Simplicial/Liu" or "Oja" depth
+
+data = cars
+head(data)
+plot(data, pch=19, cex=.5)
+plot(hexbin(data, xbins=10)) # Hexagonal binning to have an idea of the density of the data
+
+### ---------------------------------------------------------------------------------------
+### Tukey (or: Mahalanobis, Euclidean) 
+### ---------------------------------------------------------------------------------------
+### Depths
+method_name = 'Tukey'
+deep        = depth(data, method=method_name) 
+hist(deep)
+
+### Depth of a point relative to the data
+depth(c(0,0), data, method=method_name) 
+
+### Median (deepest point)
+depthMedian(data, depth_params=list(method=method_name))
+
+### Plot of depths
+depthContour(data, depth_params=list(method=method_name), graph_params=list(main='Contours'))
+depthContour(data, depth_params=list(method=method_name), points=T)
+col = colorRampPalette(c('white', 'navy'))
+depthContour(data, depth_params=list(method=method_name), points=T, colors=col)
+depthContour(data, depth_params=list(method=method_name), levels=20)
+depthContour(data, depth_params=list(method=method_name), pmean=F, pdmedian=F)
+
+depthPersp(data, depth_params=list(method=method_name))
+#depthPersp(data, depth_params=list(method=method_name), plot_method='rgl')
+
+### Plots with probabilistic meaning
+#source('depthPredictiveContour.R')
+#depthPredictiveContour(data)
+
+### Depth of the mean vs. median
+data_mean = colMeans(data)
+data_med  = depthMedian(data, depth_params=list(method=method_name))
+depth(data_mean, data, method=method_name)
+depth(data_med,  data, method=method_name)
+plot(data, pch=19, cex=0.5)
+points(data_mean[1], data_mean[2], pch=19, col='blue')
+points(data_med[1],  data_med[2],  pch=19, col='red')
+
+### ---------------------------------------------------------------------------------------
+### Outliers detection 
+### ---------------------------------------------------------------------------------------
+# Bagplot
+aplpack::bagplot(data, cex=1)
+aplpack::bagplot(data, cex=1, show.whiskers=F)
+aplpack::bagplot(data, cex=1, show.loophull=F)
+aplpack::bagplot.pairs(data, cex=1) # if dim(data)[2] > 2
+bgplot = aplpack::bagplot(data, cex=1)
+bgplot$pxy.outlier
+
+### ---------------------------------------------------------------------------------------
+### DD-Plot 
+### ---------------------------------------------------------------------------------------
+data_1 = cars
+data_2 = cars+2
+ddPlot(data_1, data_2, depth_params=list(method=method_name))
+
+### ---------------------------------------------------------------------------------------
+### Comments
+### ---------------------------------------------------------------------------------------
+### ---- Depth ----
+### Remember that "depthContour" does NOT have any forecasting or probabilistic meaning,
+### they're not densities, they're regions determined as union of points for which the depth
+### is above a certain trashold.
+### Do the isolines underly the correct distribution of points? (Are shapes coherent?)
+### ---- Bagplot ----
+### What is the shape of the bagplot of a given distribution? Sample from distributions:
+###       Beta(alpha,beta)      rbeta
+###       Bernoulli(p)          rbinom  
+###       Binomial(n,p)         rbinom
+###       Cauchy(--)            rcauchy
+###       Chi-Square(--)        rchisq
+###       Exponential(lambda)   rexp
+###       F(--)                 rf
+###       Gamma(alpha,beta)     rgamma
+###       Geometric(--)         rgeom
+###       Hypergeometric(--)    rhyper
+###       LogNormal             rlnorm
+###       Negative Binomial     rnbinom
+###       Normal(mu,sd^2)       rnorm
+###       Poisson(lambda)       rpois
+###       t-student(--)         rt
+###       Uniform(a,b)          runif
+###       Weibull(lambda,k)     rweibull
+```

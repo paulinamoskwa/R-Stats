@@ -1,0 +1,100 @@
+###########################################################################################
+###                                      SIGN TEST                                      ###
+###########################################################################################
+
+### ---------------------------------------------------------------------------------------
+### One sample
+### ---------------------------------------------------------------------------------------
+data  = cars$speed
+boxplot(data)
+q     = 0.5
+c     = 10
+n     = length(data)
+signs = sign(data>c)
+W     = sum(signs==1)
+
+### Two-sided test ------------------------------------------------------------------------
+###    H0: P(X>c)  = q    ==>    H0: W ~ Binom(n,q)         test: binom.test(W,n,q,"two.sided")
+###    H1: P(X>c) != q           H1: W ~ Binom(n,p), p!=q      
+plot(0:n, dbinom(0:n, n, q))
+abline(v=c(W,n-W), col='red')
+points(0:n, dbinom(0:n,n,q), col=(0:n>=max(W,n-W)|0:n<=min(W,n-W))+1, pch=19)
+p_value = 2*(1-pbinom(max(W,n-W)-1, n, q))
+p_value
+
+automatic_test = binom.test(W,n,q,"two.sided")
+automatic_test$p.value
+
+### One-side test -------------------------------------------------------------------------
+###    H0: P(X>c) = q    ==>    H0: W ~ Binom(n,q)           test: binom.test(W,n,q,"greater")
+###    H1: P(X>c) > q           H1: W ~ Binom(n,p), p>q 
+plot(0:n, dbinom(0:n, n, q))
+abline(v=W, col='red')
+points(0:n, dbinom(0:n,n,q), col=(0:n>=W)+1, pch=19)
+p_value = 1-pbinom(W-1, n, q)
+p_value
+
+automatic_test = binom.test(W,n,q,"greater")
+automatic_test$p.value
+
+### One-side test -------------------------------------------------------------------------
+###    H0: P(X>c) = q    ==>    H0: W ~ Binom(n,q)            test: binom.test(W,n,q,"less")
+###    H1: P(X>c) < q           H1: W ~ Binom(n,p), p<q 
+plot(0:n, dbinom(0:n, n, q))
+abline(v=(n-W), col='red')
+points(0:n, dbinom(0:n,n,q), col=(0:n>=(n-W))+1, pch=19)
+p_value = 1-pbinom((n-W)-1, n, q)
+p_value
+
+automatic_test = binom.test(W,n,q,"less")
+automatic_test$p.value
+
+### ---------------------------------------------------------------------------------------
+### Two samples-paired 
+### ---------------------------------------------------------------------------------------
+data  = cars                      # = [X,Y]
+diff  = data[,1] - data[,2]       # = X - Y
+boxplot(diff)
+q     = 0.5
+n     = length(diff)
+signs = sign(diff)
+W     = sum(signs==1)
+
+### Two-sided test ------------------------------------------------------------------------
+###    H0: P(X>Y)  = q    ==>    H0: P(Z>0)  = q    ==>    H0: W ~ Binom(n,q)
+###    H1: P(X>Y) != q           H1: P(Z>0) != q           H1: W ~ Binom(n,p), p!=q
+###                                                        test: binom.test(W,n,q,"two.sided")
+plot(0:n, dbinom(0:n, n, q))
+abline(v=c(W,n-W), col='red')
+points(0:n, dbinom(0:n,n,q), col=(0:n>=max(W,n-W)|0:n<=min(W,n-W))+1, pch=19)
+p_value = 2*(1-pbinom(max(W,n-W)-1, n, q))
+p_value
+
+automatic_test = binom.test(W,n,q,"two.sided")
+automatic_test$p.value
+
+### One-side test -------------------------------------------------------------------------
+###    H0: P(X>Y) = q    ==>    H0: P(Z>0) = q    ==>    H0: W ~ Binom(n,q)
+###    H1: P(X>Y) > q           H1: P(Z>0) > q           H1: W ~ Binom(n,p), p>q
+###                                                      test: binom.test(W,n,q,"greater")
+plot(0:n, dbinom(0:n, n, q))
+abline(v=W, col='red')
+points(0:n, dbinom(0:n,n,q), col=(0:n>=W)+1, pch=19)
+p_value = 1-pbinom(W-1, n, q)
+p_value
+
+automatic_test = binom.test(W,n,q,"greater")
+automatic_test$p.value
+
+### One-side test -------------------------------------------------------------------------
+###    H0: P(X>Y) = q    ==>    H0: P(Z>0) = q    ==>    H0: W ~ Binom(n,q)
+###    H1: P(X>Y) < q           H1: P(Z>0) < q           H1: W ~ Binom(n,p), p<q
+###                                                      test: binom.test(W,n,q,"less")
+plot(0:n, dbinom(0:n, n, q))
+abline(v=(n-W), col='red')
+points(0:n, dbinom(0:n,n,q), col=(0:n>=(n-W))+1, pch=19)
+p_value = 1-pbinom((n-W)-1, n, q)
+p_value
+
+automatic_test = binom.test(W,n,q,"less")
+automatic_test$p.value

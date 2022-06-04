@@ -1,0 +1,88 @@
+###########################################################################################
+###                                  PERMUTATION TEST                                   ###
+###                             Two independent samples (1-dim)                         ###
+###########################################################################################
+seed = 100
+B    = 1000
+
+### Two-sided test ------------------------------------------------------------------------
+###    H0: X1  =^d X2
+###    H1: X1 !=^d X2
+### Test statistic: abs(mean(data_1)-mean(data_2)) // or: abs(median(data_1)-median(data_2))
+data_1 = cars$speed
+data_2 = cars$dist
+n1     = length(data_1)
+n2     = length(data_2)
+n      = n1+n2
+
+set.seed(seed)
+data_pool      = c(data_1, data_2)
+perm           = sample(1:n)
+data_pool_perm = data_pool[perm]
+data_1_perm    = data_pool_perm[1:n1]
+data_2_perm    = data_pool_perm[(n1+1):n]
+
+par(mfrow=c(1,2))
+boxplot(data_1, data_2, main='Original')
+boxplot(data_1_perm, data_2_perm, main='Permuted')
+
+# CMC to estimate the p-value 
+T0     = abs(mean(data_1)-mean(data_2))
+T_stat = numeric(B)
+for(k in 1:B){
+  perm           = sample(1:n)
+  data_pool_perm = data_pool[perm]
+  data_1_perm    = data_pool_perm[1:n1]
+  data_2_perm    = data_pool_perm[(n1+1):n]
+  T_stat[k]      = abs(mean(data_1_perm)-mean(data_2_perm))
+}
+
+# Permutational distribution of T
+hist(T_stat, xlim=range(c(T_stat,T0)), breaks=30)
+abline(v=T0, col=3, lwd=2)
+plot(ecdf(T_stat), xlim=range(c(T_stat,T0)))
+abline(v=T0, col=3, lwd=2)
+
+# p-value
+p_value = sum(T_stat>=T0)/B
+p_value
+
+### One-side test -------------------------------------------------------------------------
+###    H0: var(data_1) = var(data_2)                       (we think data_1 has higher var)
+###    H1: var(data_1) > var(data_2)
+### Test statistic: (s^2)_1 / (s^2)_2
+data_1    = cars$speed
+data_2    = cars$dist
+n1        = length(data_1)
+n2        = length(data_2)
+n         = n1+n2
+data_pool = c(data_1, data_2)
+
+# CMC to estimate the p-value 
+set.seed(seed)
+T0     = var(data_1)/var(data_2)
+T_stat = numeric(B)
+for(k in 1:B){
+  perm           = sample(1:n)
+  data_pool_perm = data_pool[perm]
+  data_1_perm    = data_pool_perm[1:n1]
+  data_2_perm    = data_pool_perm[(n1+1):n]
+  T_stat[k]      = var(data_1_perm)/var(data_2_perm)
+}
+
+# Permutational distribution of T
+hist(T_stat, xlim=range(c(T_stat,T0)), breaks=30)
+abline(v=T0, col=3, lwd=2)
+plot(ecdf(T_stat), xlim=range(c(T_stat,T0)))
+abline(v=T0, col=3, lwd=2)
+
+# p-value
+p_value = sum(T_stat>=T0)/B
+p_value
+
+### ---------------------------------------------------------------------------------------
+### More informations
+### ---------------------------------------------------------------------------------------
+factorial(n)                                      # cardinality of the permutational space
+factorial(n)/(2*factorial(n1)*factorial(n2))      # number of distinct values of T
+1/(factorial(n))/(2*factorial(n1)*factorial(n2))  # minimum achievable p-value

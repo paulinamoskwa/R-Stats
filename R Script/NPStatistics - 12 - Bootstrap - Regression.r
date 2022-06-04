@@ -1,0 +1,130 @@
+###########################################################################################
+###                                      BOOTSTRAP                                      ###
+###                                     Regression                                      ###
+###########################################################################################
+seed  = 100
+B     = 1000
+alpha = 0.1
+
+### ---------------------------------------------------------------------------------------
+### Linear Regression
+### ---------------------------------------------------------------------------------------
+# data = [X, Y]
+grades = read.table('parziali.txt', header=T)
+data   = grades
+x      = data[,1]
+y      = data[,2]
+fm     = lm(y ~ x)
+
+plot(x,y,asp=1)
+abline(coefficients(fm), col='red')
+points(x, fitted(fm), col='red', pch=16)
+summary(fm)
+shapiro.test(fm$residuals)
+
+### Bootstrap distribution for b0 (intercept) and b1 (slope)
+fitted_obs = fitted(fm)
+res_obs    = residuals(fm)
+b0_obs     = coefficients(fm)[1]
+b1_obs     = coefficients(fm)[2]
+
+set.seed(seed)
+T_boot_b0 = numeric(B)
+T_boot_b1 = numeric(B)
+for(k in 1:B){
+  y_boot       = fitted_obs + sample(res_obs, replace=T)
+  fm_boot      = lm(y_boot ~ x)
+  T_boot_b0[k] = coefficients(fm_boot)[1]
+  T_boot_b1[k] = coefficients(fm_boot)[2]
+}
+
+par(mfrow=c(1,2))
+plot(ecdf(T_boot_b0), main='Intercept')
+abline(v=b0_obs, lty=2, col='red')
+plot(ecdf(T_boot_b1), main='Slope')
+abline(v=b1_obs, lty=2, col='red')
+
+### Bootstrap standard deviation and covariance
+sd(T_boot_b0)
+sd(T_boot_b1)
+cov(T_boot_b0, T_boot_b1)
+
+### CI (Reverse Percentile)
+right_quantile_b0 = quantile(T_boot_b0, 1-alpha/2)
+right_quantile_b1 = quantile(T_boot_b1, 1-alpha/2)
+left_quantile_b0  = quantile(T_boot_b0, alpha/2)
+left_quantile_b1  = quantile(T_boot_b1, alpha/2)
+
+CI_b0 = c(b0_obs-(right_quantile_b0-b0_obs), b0_obs, b0_obs-(left_quantile_b0-b0_obs))
+CI_b0
+plot(ecdf(T_boot_b0), main='Intercept')
+abline(v=b0_obs, lty=2, col='red')
+abline(v=CI_b0[c(1,3)], col='red')
+
+CI_b1 = c(b1_obs-(right_quantile_b1-b1_obs), b1_obs, b1_obs-(left_quantile_b1-b1_obs))
+CI_b1
+plot(ecdf(T_boot_b1), main='Slope')
+abline(v=b1_obs, lty=2, col='red')
+abline(v=CI_b1[c(1,3)], col='red')
+
+### CI at a given x0
+x0                     = 24
+mean_x0_obs            = b0_obs + b1_obs * x0
+T_boot_mean_x0         = T_boot_b0 + T_boot_b1*x0
+right_quantile_mean_x0 = quantile(T_boot_mean_x0, 1-alpha/2)
+left_quantile_mean_x0  = quantile(T_boot_mean_x0, alpha/2)
+CI_mean_x0             =  c(mean_x0_obs - (right_quantile_mean_x0-mean_x0_obs),
+                            mean_x0_obs,
+                            mean_x0_obs - (left_quantile_mean_x0-mean_x0_obs))
+par(mfrow=c(1,1))
+plot(ecdf(T_boot_mean_x0), main='Conditional mean at x0')
+abline(v=mean_x0_obs, lty=2, col='green')
+abline(v=CI_mean_x0[c(1,3)], col='green')
+
+### ---------------------------------------------------------------------------------------
+### Non Linear Regression
+### ---------------------------------------------------------------------------------------
+# data = [X, Y]
+data = subset(Orange, Orange$Tree==3)
+data = data[,c(2,3)]
+x    = data[,1]
+y    = data[,2]
+plot(x,y,pch=19)
+
+logistic = function(t,L,k,midpoint){L/(1+exp((midpoint-t)/k))}
+model    = nls(y ~ logistic(x,L,k,midpoint), start=list(L=150, k=500, midpoint=700))
+summary(model)
+x_grid   = seq(range(x)[1], range(x)[2], length.out=100)
+x_grid   = seq(0, 2500, length.out=100)
+y_pred   = predict(model, list(x=x_grid))
+plot(x,y,pch=19)
+lines(x_grid,y_pred,col='red')
+
+### Bootstrap distribution for L
+fitted_obs = fitted(model)
+res_obs    = residuals(model)
+L_obs      = coefficients(model)[1]
+
+set.seed(seed)
+T_boot_L     = numeric(B)
+formula_boot = y_boot ~ logistic(x,L,k,midpoint)
+for(k in 1:B){
+  y_boot      = fitted_obs + sample(res_obs, replace=T)
+  fm_boot     = nls(formula_boot, start=list(L=150, k=500, midpoint=700))
+  T_boot_L[k] = coefficients(fm_boot)[1]
+}
+
+plot(ecdf(T_boot_L), main='L')
+abline(v=L_obs, lty=2, col='red')
+
+### CI (Reverse Percentile)
+right_quantile_L = quantile(T_boot_L, 1-alpha/2)
+left_quantile_L  = quantile(T_boot_L, alpha/2)
+CI_L             = c(L_obs-(right_quantile_L-L_obs), L_obs, L_obs-(left_quantile_L-L_obs))
+CI_L
+abline(v=CI_L[c(1,3)], col='red')
+
+### In this case L is the asymptot, we can see its effect on the curve:
+plot(x,y,pch=19,main='Fitted curve vs. Data', xlim=c(0,2500), ylim=c(20,200))
+lines(x_grid,y_pred,col='red')
+abline(h=CI_L, col='red')

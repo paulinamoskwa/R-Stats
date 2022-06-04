@@ -1,0 +1,216 @@
+###########################################################################################
+###                                      BOOTSTRAP                                      ###
+###                                Confidence Intervals                                 ###
+###########################################################################################
+seed  = 100
+B     = 1000
+alpha = 0.1
+
+### ---------------------------------------------------------------------------------------
+### Naive
+### ---------------------------------------------------------------------------------------
+grades = read.table('parziali.txt', header=T)
+data   = grades[,'PI']
+boxplot(data)
+
+# Estimator 1: 0.95 quantile    (remember that 0.5 = median)
+# Estimator 2: prob(data>=18)
+# Estimator 3: mean
+est1 = quantile(data, 0.95)
+est2 = sum(data>=18)/length(data)
+est3 = mean(data)
+
+# Bootstrap distribution of the estimators
+set.seed(seed)
+T_boot_est1 = numeric(B)
+T_boot_est2 = numeric(B)
+T_boot_est3 = numeric(B)
+for(k in 1:B){
+  data_boot      = sample(data, replace=T)
+  T_boot_est1[k] = quantile(data_boot, 0.95)
+  T_boot_est2[k] = sum(data_boot>=18)/length(data_boot)
+  T_boot_est3[k] = mean(data_boot)
+}
+
+par(mfrow=c(1,3))
+plot(ecdf(T_boot_est1), main="Quantile")
+abline(v=est1, lty=2, col='red')
+plot(ecdf(T_boot_est2), main="Probability")
+abline(v=est2, lty=2, col='red')
+plot(ecdf(T_boot_est3), main="Mean")
+abline(v=est3, lty=2, col='red')
+
+### |---------------------------|
+### | CI Estimator 1 - quantile |
+### |---------------------------|
+### Reverse Percentile
+par(mfrow=c(1,1))
+plot(ecdf(T_boot_est1), main="Estimator 1")
+abline(v=est1, lty=2, col='red')
+
+right_quantile = quantile(T_boot_est1, 1-alpha/2)
+left_quantile  = quantile(T_boot_est1, alpha/2)
+CI_est1 = c(est1-(right_quantile-est1), est1, est1-(left_quantile-est1))
+CI_est1
+abline(v=CI_est1[c(1,3)], col='red')
+
+### |-----------------------------|
+### | CI Estimator 2 - probabiity | 
+### |-----------------------------|
+### Reverse Percentile
+par(mfrow=c(1,1))
+plot(ecdf(T_boot_est2), main="Estimator 2")
+abline(v=est2, lty=2, col='red')
+
+right_quantile = quantile(T_boot_est2, 1-alpha/2)
+left_quantile  = quantile(T_boot_est2, alpha/2)
+CI_est2 = c(est2-(right_quantile-est2), est2, est2-(left_quantile-est2))
+CI_est2
+abline(v=CI_est2[c(1,3)], col='red')
+
+### t-intervals (we use a standard deviation formula)
+par(mfrow=c(1,1))
+plot(ecdf(T_boot_est2), main="Estimator 2")
+abline(v=est2, lty=2, col='red')
+
+prob = sum(data>=18)/length(data)
+
+set.seed(seed)
+T_boot_est2 = numeric(B)
+for(k in 1:B){
+  data_boot      = sample(data, replace=T)
+  prob_perm      = sum(data_boot>=18)/length(data_boot)
+  T_boot_est2[k] = (prob_perm - prob) / sqrt(prob_perm*(1-prob_perm)/length(data))
+}
+
+right_t_quantile = quantile(T_boot_est2, 1-alpha/2)
+left_t_quantile  = quantile(T_boot_est2, alpha/2)
+CI_t_est2 = c(prob-right_t_quantile * sqrt(prob*(1-prob)/length(data)), prob,
+              prob-left_t_quantile *  sqrt(prob*(1-prob)/length(data)))
+CI_t_est2
+abline(v=CI_t_est2[c(1,3)], col='red')
+
+### |-----------------------|
+### | CI Estimator 3 - mean |
+### |-----------------------|
+### Reverse Percentile
+par(mfrow=c(1,1))
+plot(ecdf(T_boot_est3), main="Estimator 3")
+abline(v=est3, lty=2, col='red')
+
+right_quantile = quantile(T_boot_est3, 1-alpha/2)
+left_quantile  = quantile(T_boot_est3, alpha/2)
+CI_est3 = c(est3-(right_quantile-est3), est3, est3-(left_quantile-est3))
+CI_est3
+abline(v=CI_est3[c(1,3)], col='red')
+
+### ---------------------------------------------------------------------------------------
+### Parametric (Gaussian)
+### ---------------------------------------------------------------------------------------
+grades = read.table('parziali.txt', header=T)
+data   = grades[,'PI']
+boxplot(data)
+shapiro.test(data)
+#shapiro.test(log(data))  # -> if ok, then data are log-normal
+
+# Estimator 1: 0.95 quantile    (remember that 0.5 = median)
+# Estimator 2: prob(data>=18)
+# Estimator 3: mean
+est1 = quantile(data, 0.95)
+est2 = sum(data>=18)/length(data)
+est3 = mean(data)
+
+# Bootstrap distribution of the estimators
+set.seed(seed)
+T_boot_est1 = numeric(B)
+T_boot_est2 = numeric(B)
+T_boot_est3 = numeric(B)
+for(k in 1:B){
+  data_boot      = rnorm(length(data), mean(data), sd(data))
+  #data_boot      = exp(rnorm(length(data), mean(log(data)), sqrt(var(log(data)))))
+  T_boot_est1[k] = quantile(data_boot, 0.95)
+  T_boot_est2[k] = sum(data_boot>=18)/length(data_boot)
+  T_boot_est3[k] = mean(data_boot)
+}
+
+par(mfrow=c(1,3))
+plot(ecdf(T_boot_est1), main="Quantile")
+abline(v=est1, lty=2, col='red')
+plot(ecdf(T_boot_est2), main="Probability")
+abline(v=est2, lty=2, col='red')
+plot(ecdf(T_boot_est3), main="Mean")
+abline(v=est3, lty=2, col='red')
+
+### |---------------------------|
+### | CI Estimator 1 - quantile |
+### |---------------------------|
+### Reverse Percentile
+par(mfrow=c(1,1))
+plot(ecdf(T_boot_est1), main="Estimator 1")
+abline(v=est1, lty=2, col='red')
+
+right_quantile = quantile(T_boot_est1, 1-alpha/2)
+left_quantile  = quantile(T_boot_est1, alpha/2)
+CI_est1 = c(est1-(right_quantile-est1), est1, est1-(left_quantile-est1))
+CI_est1
+abline(v=CI_est1[c(1,3)], col='red')
+
+### |-----------------------------|
+### | CI Estimator 2 - probabiity |
+### |-----------------------------|
+### Reverse Percentile
+par(mfrow=c(1,1))
+plot(ecdf(T_boot_est2), main="Estimator 2")
+abline(v=est2, lty=2, col='red')
+
+right_quantile = quantile(T_boot_est2, 1-alpha/2)
+left_quantile  = quantile(T_boot_est2, alpha/2)
+CI_est2 = c(est2-(right_quantile-est2), est2, est2-(left_quantile-est2))
+CI_est2
+abline(v=CI_est2[c(1,3)], col='red')
+
+### t-intervals (we use a standard deviation formula)
+par(mfrow=c(1,1))
+plot(ecdf(T_boot_est2), main="Estimator 2")
+abline(v=est2, lty=2, col='red')
+
+prob = sum(data>=18)/length(data)
+
+set.seed(seed)
+T_boot_est2 = numeric(B)
+for(k in 1:B){
+  data_boot      = sample(data, replace=T)
+  prob_perm      = sum(data_boot>=18)/length(data_boot)
+  T_boot_est2[k] = (prob_perm - prob) / sqrt(prob_perm*(1-prob_perm)/length(data))
+}
+
+right_t_quantile = quantile(T_boot_est2, 1-alpha/2)
+left_t_quantile  = quantile(T_boot_est2, alpha/2)
+CI_t_est2 = c(prob-right_t_quantile * sqrt(prob*(1-prob)/length(data)), prob,
+              prob-left_t_quantile *  sqrt(prob*(1-prob)/length(data)))
+CI_t_est2
+abline(v=CI_t_est2[c(1,3)], col='red')
+
+### |-----------------------|
+### | CI Estimator 3 - mean |
+### |-----------------------|
+### Reverse Percentile
+par(mfrow=c(1,1))
+plot(ecdf(T_boot_est3), main="Estimator 3")
+abline(v=est3, lty=2, col='red')
+
+right_quantile = quantile(T_boot_est3, 1-alpha/2)
+left_quantile  = quantile(T_boot_est3, alpha/2)
+CI_est3 = c(est3-(right_quantile-est3), est3, est3-(left_quantile-est3))
+CI_est3
+abline(v=CI_est3[c(1,3)], col='red')
+
+### ---------------------------------------------------------------------------------------
+### Comparison: parametric vs. non parametric
+### ---------------------------------------------------------------------------------------
+sd   = sd(T_boot_est3)                                  # standard deviation
+var  = var(T_boot_est3)                                 # variance
+bias = mean(T_boot_est3) - est3                         # bias
+MSE  = sd(T_boot_est3)^2+(mean(T_boot_est3)-est3)^2     # MSE
+
+#data.frame("Non Param"=c(var,bias,MSE), "Param"=c(var,bias,MSE))

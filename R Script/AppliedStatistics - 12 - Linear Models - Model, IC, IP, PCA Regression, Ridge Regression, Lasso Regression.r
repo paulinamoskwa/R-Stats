@@ -1,0 +1,543 @@
+
+# Linear Models
+
+# ------------------------------------------------------------------------------------
+# 0. Settings
+# ------------------------------------------------------------------------------------
+library(MASS)
+library(car)
+library(rgl)
+
+# ------------------------------------------------------------------------------------
+# Part 1 - Linear models, plots, clustering
+# ------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------
+# 1. Dataset
+# ------------------------------------------------------------------------------------
+data = cars
+data[, 'speed^2'] = cars$speed^2
+data = data[,-2]
+data[, 'dist'] = cars$dist
+head(data)
+
+# Re-name
+n = dim(data)[1]
+p = dim(data)[2]-1
+v = 'X1'
+if(p>1){
+  for(i in 2:p){
+    v = c(v, paste('X',i,sep=''))
+  }
+}
+v = c(v, 'Y')
+v
+colnames(data) = v
+head(data)
+attach(data)
+
+# ------------------------------------------------------------------------------------
+# 2. Exploring (p=2)
+# ------------------------------------------------------------------------------------
+plot(X1, Y, xlab='X1', ylab='Y')
+plot(X2, Y, xlab='X2', ylab='Y')
+pairs(data)
+#plot3d(X1, X2, Y, size=4, asp = T)
+
+# ------------------------------------------------------------------------------------
+# 3. Model
+# ------------------------------------------------------------------------------------
+# Y = beta_0 + beta_1 * X1 + beta_2 * X2 + Eps
+
+## Assumptions:
+# 1) Parameter estimation: E(Eps) = 0 and Var(Eps) = sigma^2
+# 2) Inference : Eps ~ N(0, sigma^2)
+
+# Estimate the parameters
+fm = lm(Y ~ X1 + X2)
+summary(fm)
+vif(fm)
+
+# Comment
+# * Residual standard error = estimate of sigma
+# * Degrees of freedom = n-(r+1)
+# * F-statistic - p.value = H0: beta_1 = .. = beta_r = 0
+#   (low p-value -> it makes sense to go on)
+# * Check for R^2 and R.adj^2
+# * Residuals have to be symmetric 
+# * Pr(>|t|) = p-value of the one-at-time beta test
+#   !ATTENTION! Delete one-at-the-time
+
+# Y hat
+fitted(fm)
+
+# Eps hat
+residuals(fm)
+plot(residuals(fm))
+
+# Beta hat
+coefficients(fm)
+
+# Cov(beta hat) = sigma^2 * (Z^T * Z)^(-1)
+vcov(fm)
+
+# Order of the model (r+1)
+fm$rank
+
+# Degrees of freedom for the residuals
+fm$df
+
+# Leverages h_ii
+hatvalues(fm)
+
+# Standardized residuals
+rstandard(fm)
+plot(rstandard(fm))
+
+# Estimate of sigma^2
+sum(residuals(fm)^2)/fm$df
+
+# ------------------------------------------------------------------------------------
+# 4. Regression plot
+# (specific case of a regression of the form: Y = b_0 + b_1 * X + b_2 * X^2)
+# ------------------------------------------------------------------------------------
+x = seq(0,30,by=0.01)
+b = coef(fm)
+plot(X1, Y, xlab='X1', ylab='Y')
+lines(x, b[1]+b[2]*x+b[3]*x^2)
+
+# If p=2: 3D plot
+#par3d(windowRect=c(680,40,1350,720))
+#points3d(x=X1, y=X2, z=Y, size=4, aspect = T)
+#box3d()
+#axes3d()
+#points3d(x=X1, y=X2, z=fitted(fm), size=4, col = 'blue')
+#surface3d(range(data$X1), range(data$X2),
+#          matrix(predict(fm, expand.grid(X1=range(X1), X2=range(X2))),2,2),alpha = 0.5)
+
+# ------------------------------------------------------------------------------------
+# 5. Inference on Betas
+# ------------------------------------------------------------------------------------
+## Assuption: Eps ~ N(0, sigma^2)
+## Test (Fisher):
+##    H0: (beta1, beta2) == (0, 0)
+##    H1: (beta1, beta2) != (0, 0)
+
+linearHypothesis(fm, rbind(c(0,1,0), c(0,0,1)), c(0,0))
+
+# With more betas (e.g. 3):
+# linearHypothesis(fm, rbind(c(0,1,0,0), c(0,0,1,0), c(0,0,0,1)), c(0,0,0))
+
+# Comment
+#   Pr(>F) = final p-value in summary(fm)
+
+r = fm$rank - 1
+
+# ------------------------------------------------------------------------------------
+# 6. Confidence Regions (if p=2)
+# ------------------------------------------------------------------------------------
+# Center
+c(coefficients(fm)[2], coefficients(fm)[3])
+
+# Direction of the axes
+eigen(vcov(fm)[2:3, 2:3])$vectors
+plot(coefficients(fm)[2], coefficients(fm)[3], xlim = c(-6,6), ylim = c(-6,6),
+     asp=1, xlab='beta1', ylab='beta2')
+ellipse(coefficients(fm)[2:3], vcov(fm)[2:3,2:3], sqrt(p*qf(1-0.05,p,n-(r+1))))
+abline(v=0)
+abline(h=0)
+
+# Comment
+#   If it is 'squished' then (probably) they're collinear.
+
+# ------------------------------------------------------------------------------------
+# 7. Bonferroni Intervals (level 95%, p=2)
+# ------------------------------------------------------------------------------------
+Bf = rbind(
+  beta1=c(coefficients(fm)[2]-sqrt(vcov(fm)[2,2])*qt(1-0.05/(2*p), n-(r+1)),
+          coefficients(fm)[2]+sqrt(vcov(fm)[2,2])*qt(1-0.05/(2*p), n-(r+1))),
+  beta2=c(coefficients(fm)[3]-sqrt(vcov(fm)[3,3])*qt(1-0.05/(2*p), n-(r+1)),
+          coefficients(fm)[3]+sqrt(vcov(fm)[3,3])*qt(1-0.05/(2*p), n-(r+1))))
+Bf
+
+# Generic beta_j (p, r, n, alpha generici)
+# beta_j = c(coefficients(fm)[j]-sqrt(vcov(fm)[j,j])*qt(1-alpha/(2*p), n-(r+1)),
+# coefficients(fm)[j]+sqrt(vcov(fm)[j,j])*qt(1-alpha/(2*p), n-(r+1)))
+
+# Alternatively: Bonferroni's correction
+confint(fm, level= 1-0.05/p)[2:3,]
+
+# ------------------------------------------------------------------------------------
+# 8. Other tests with "linearHypothesis"
+# ------------------------------------------------------------------------------------
+# Test:
+#   H0: (beta0+beta2, beta1) == (0,0)
+#   H1: (beta0+beta2, beta1) != (0,0)
+
+C = rbind(c(1,0,1), c(0,1,0))
+linearHypothesis(fm, C, c(0,0))
+
+# Simultaneous CI (beta_j combinations):
+
+# Fisher 1-alpha quantile 
+alpha = 0.05
+qf.fish = qf(1-alpha, r+1, n-(r+1))
+
+# Customized combination (here we just consider beta_1)
+a = c(0,1,0)
+
+# Confidence Interval
+sim_IC = c(t(a)%*%coefficients(fm) - sqrt(t(a)%*%vcov(fm)%*%a) * sqrt((r+1)*qf.fish),
+           t(a)%*%coefficients(fm) + sqrt(t(a)%*%vcov(fm)%*%a) * sqrt((r+1)*qf.fish))
+sim_IC
+
+# ------------------------------------------------------------------------------------
+# 9. Inference on the mean (CI(E[Y|X]), PI(Y))
+# ------------------------------------------------------------------------------------
+# New sample
+Z0.new = data.frame(X1=10, X2=10^2)
+
+alpha = 0.05
+
+# CI(E[Y|X])
+Conf = predict(fm, Z0.new, interval='confidence', level=1-alpha)
+Conf
+
+# PI(Y)
+Pred = predict(fm, Z0.new, interval='prediction', level=1-alpha)
+Pred
+
+# ------------------------------------------------------------------------------------
+# 10. Plot IC vs IP: one sample
+# ------------------------------------------------------------------------------------
+# Particularity for this model case
+plot(X1, Y, xlab='X1', ylab='Y', las=1)
+x = seq(0,30,by=0.1)
+b = coef(fm)
+lines(x, b[1]+b[2]*x+b[3]*x^2)
+points(10,Conf[1], pch=19)
+segments(10,Pred[2],10,Pred[3],col='gold', lwd=2)
+segments(10,Conf[2],10,Conf[3],col='red', lwd=2)
+points(10,Conf[2], pch='-', col='red', lwd=2)
+points(10,Conf[3], pch='-', col='red', lwd=2)
+points(10,Pred[2], pch='-', col='gold', lwd=2)
+points(10,Pred[3], pch='-', col='gold', lwd=2)
+
+# ------------------------------------------------------------------------------------
+# 11. Plot IC vs IP: grid of sample
+# ------------------------------------------------------------------------------------
+Z0 = data.frame(cbind(X1 = seq(min(X1), max(X1), length=100),
+                      X2 = seq(min(X2), max(X2), length=100)))
+Conf = predict(fm, Z0, interval='confidence')
+Pred = predict(fm, Z0, interval='prediction')
+plot(X1, Y, xlab='X1', ylab='Y', las=1)
+lines(Z0[,1], Conf[,'fit'])
+lines(Z0[,1], Conf[,'lwr'], lty=2, col='red', lwd=2)
+lines(Z0[,1], Conf[,'upr'], lty=2, col='red', lwd=2)
+lines(Z0[,1], Pred[,'lwr'], lty=3, col='gold', lwd=2)
+lines(Z0[,1], Pred[,'upr'], lty=3, col='gold', lwd=2)
+
+# Comment
+#   These are NOT confidence/prediction BANDS, they're done one-at-the-time.
+
+# ------------------------------------------------------------------------------------
+# 12. Verify assumptions (used for inference and estimate of parameters)
+# ------------------------------------------------------------------------------------
+# * gaussianity
+# * homoschedasticity
+# ------------------------------------------------------------------------------------
+par(mfrow=c(2,2))
+plot(fm)
+
+# Comment
+#   1. We want to see no pattern: a cloud around the zero
+#   2. We want to see a good fit on the line
+#   3. Again, we want to see no pattern
+#   4. We have the iso-lines of the Cook distance: we can identify the outliers
+
+shapiro.test(residuals(fm))
+detach(data)
+
+# ------------------------------------------------------------------------------------
+# 13. Data transformation (another example)
+# ------------------------------------------------------------------------------------
+data = read.table('brain_weight.txt', head=T)
+head(data)
+
+# Re-name
+n = dim(data)[1]
+p = dim(data)[2]-1
+v = 'X1'
+if(p>1){
+  for(i in 2:p){
+    v = c(v, paste('X',i,sep=''))
+  }
+}
+v = c(v, 'Y')
+v
+colnames(data) = v
+head(data)
+attach(data)
+
+# Linear regression
+logX1 = log(X1)
+logY  = log(Y)
+fm    = lm(logY~logX1)
+
+# Plot
+plot(logX1, logY)
+abline(coef(fm)[1], coef(fm)[2])
+
+# Plot IC vs IP: transformed datas' grid
+logZ0 = data.frame(logX1=seq(min(logX1), max(logX1), length=100))
+Conf  = predict(fm, logZ0, interval='confidence')
+Pred  = predict(fm, logZ0, interval='prediction')
+
+plot(logX1, logY, xlab='logX1', ylab='logY', las=1)
+lines(logZ0[,1], Conf[,'fit'])
+lines(logZ0[,1], Conf[,'lwr'], lty=2, col='red', lwd=2)
+lines(logZ0[,1], Conf[,'upr'], lty=2, col='red', lwd=2)
+lines(logZ0[,1], Pred[,'lwr'], lty=3, col='gold', lwd=2)
+lines(logZ0[,1], Pred[,'upr'], lty=3, col='gold', lwd=2)
+
+# Comment
+#   These are NOT confidence/prediction BANDS, they're done one-at-the-time.
+
+# Plot IC vs IP: transformed datas' grid
+plot(X1, Y, xlab='X1', ylab='Y', las=1)
+CI = exp(Conf)
+PI = exp(Pred)
+Z0 = exp(logZ0)
+
+lines(Z0[,1], CI[,'fit'])
+lines(Z0[,1], CI[,'lwr'], lty=2, col='red', lwd=2)
+lines(Z0[,1], CI[,'upr'], lty=2, col='red', lwd=2)
+lines(Z0[,1], PI[,'lwr'], lty=3, col='gold', lwd=2)
+lines(Z0[,1], PI[,'upr'], lty=3, col='gold', lwd=2)
+
+# Comment
+#   These are NOT confidence/prediction BANDS, they're done one-at-the-time.
+
+detach(data)
+
+# ------------------------------------------------------------------------------------
+# 14. Desperate Case: Introduction of Dummy Variables
+# ------------------------------------------------------------------------------------
+# If the model is terrible, we can try to perform a hierarchical clustering and 
+# add some dummy vairbales (given by the cluster)
+
+data = read.table('brain_weight.txt', head=T)
+head(data)
+
+# Re-name
+n = dim(data)[1]
+p = dim(data)[2]-1
+v = 'X1'
+if(p>1){
+  for(i in 2:p){
+    v = c(v, paste('X',i,sep=''))
+  }
+}
+v = c(v, 'Y')
+v
+colnames(data) = v
+head(data)
+
+data['X2'] = data['X1']^2
+head(data)
+
+# Cluster method: ward
+clusterw = cutree(hclust(dist(data), method='ward.D2'),2)
+dummy = clusterw - 1
+
+# Model
+# Y = b_0 + b_1*X1 + b_2*X2 + b_3*dummy + b_4*dummy*X1 + b_5*dummy*X2
+fm2 = lm(Y ~ X1 + X2 + dummy + X1:dummy + X2:dummy, data=data)
+summary(fm2)
+
+# Plot
+par(mfrow=c(2,2))
+plot(fm2)
+
+# ------------------------------------------------------------------------------------
+# Part 2 - Collinearity: PCA, Ridge, Lasso
+# ------------------------------------------------------------------------------------
+# 1. Dataset
+# ------------------------------------------------------------------------------------
+data = cars
+data[, 'speed^2'] = cars$speed^2
+data = data[,-2]
+data[, 'dist'] = cars$dist
+head(data)
+
+# Re-name
+n = dim(data)[1]
+p = dim(data)[2]-1
+v = 'X1'
+if(p>1){
+  for(i in 2:p){
+    v = c(v, paste('X',i,sep=''))
+  }
+}
+v = c(v, 'Y')
+v
+colnames(data) = v
+head(data)
+attach(data)
+
+# ------------------------------------------------------------------------------------
+# 2. Model
+# ------------------------------------------------------------------------------------
+fm = lm(Y ~ X1 + X2)
+summary(fm)
+
+# Check for collinearity
+vif(fm)
+
+# Note
+#   If it is >10 then it is considered 'high'
+
+# ------------------------------------------------------------------------------------
+# 3. PCA Regression (p=2)
+# ------------------------------------------------------------------------------------
+# PCA
+data.pc = princomp(cbind(X1,X2), scores=TRUE)
+summary(data.pc)
+
+# Note
+#   Based on 'Cumulative Proportion' we decide how many components to consider.
+
+# PCA regression
+#   Y = a_0 + a_1 * X1.pc + a_2 * X2.pc
+X1.pc = data.pc$scores[,1]
+X2.pc = data.pc$scores[,2]
+fm.pc = lm(Y ~ X1.pc + X2.pc)
+summary(fm.pc)
+
+# Back to original variables
+#   Y = b_0 + b_1 * X1 + b_2 * X2
+# Transforming PCA regression:
+#   b_0 = a_0
+#   b_j = (e_j1 * a_1 + .. + e_jp * a_p )
+# we create an alphas vector: [a_1, a_2, .., a_k]
+k = length(fm.pc$coefficients)-1
+alphas = as.vector(fm.pc$coefficients)
+alpha0 = alphas[1]
+alphas = alphas[2:(k+1)]
+alphas = as.matrix(alphas) # (k x 1)
+
+# and we take the loadings that are needed (first k)
+E = as.matrix(data.pc$loadings[,])
+E = as.matrix(E[,1:k]) # (p x k)
+
+# we create the betas vector: [b_1, .., b_p]
+betas = as.matrix(0*(1:p)) # (p x 1)
+
+# we create the vetor of the means: [m1, .., mp]
+m = 0*(1:p)
+m[1] = mean(X1)
+m[2] = mean(X2)
+m = as.matrix(m) # (p x 1)
+
+# beta_1, .., beta_p
+betas = E %*% alphas
+
+# beta 0
+b_0 = alpha0 - t(m) %*% betas
+
+# beta together
+# b_0, b_1, .., b_p
+beta_finali = c(b_0, betas)
+beta_finali
+
+# ------------------------------------------------------------------------------------
+# 4. Ridge Regression
+# ------------------------------------------------------------------------------------
+lambda = 0.5
+fm.ridge = lm.ridge(Y ~ X1 + X2, lambda = lambda)
+
+# Cofficients
+coef(fm.ridge)
+
+# Y.hat
+y.hat.ridge = cbind(rep(1,n), X1, X2) %*% coef(fm.ridge)
+
+# Optimal lambda
+lambda.c=seq(0,10,0.01)
+fm.ridge = lm.ridge(Y ~ X1 + X2, lambda = lambda.c)
+select(fm.ridge)
+
+# Alternatives (optimal lambda)
+lambda.c=seq(0,10,0.01)
+fm.ridge = lm.ridge(Y ~ X1 + X2, lambda = lambda.c)
+lambda.opt = lambda.c[which.min(fm.ridge$GCV)]
+
+# Cofficients for optimal lambda
+coef.ridge = coef(fm.ridge)[which.min(fm.ridge$GCV),]
+coef.ridge
+
+# ------------------------------------------------------------------------------------
+# 5. Ridge Regression (2)
+# ------------------------------------------------------------------------------------
+library(glmnet)
+x = model.matrix(Y ~ X1 + X2)[,-1] # matrix of predictors
+y = Y # vector of response
+lambda.grid = 10^seq(5,-3,length=50)
+
+# Ridge regression
+fit.ridge = glmnet(x,y, lambda = lambda.grid, alpha=0) # alpha=0 -> ridge
+plot(fit.ridge,xvar='lambda',label=TRUE, col = rainbow(dim(x)[2]))
+legend('topright', dimnames(x)[[2]], col = rainbow(dim(x)[2]), lty=1, cex=1)
+
+# Set lambda via CV
+cv.ridge = cv.glmnet(x,y,alpha=0,nfolds=3,lambda=lambda.grid)
+bestlam.ridge = cv.ridge$lambda.min
+bestlam.ridge
+
+plot(cv.ridge)
+abline(v=log(bestlam.ridge), lty=1)
+coef.ridge <- predict(fit.ridge, s=bestlam.ridge, type = 'coefficients')[1:(p+1),]
+coef.ridge
+plot(fit.ridge,xvar='lambda',label=TRUE, col = rainbow(dim(x)[2]))
+abline(v=log(bestlam.ridge))
+
+# ------------------------------------------------------------------------------------
+# 6. Lasso Regression
+# ------------------------------------------------------------------------------------
+library(glmnet)
+x = model.matrix(Y ~ X1 + X2)[,-1] # matrix of predictors
+y = Y # vector of response
+lambda.grid = 10^seq(5,-3,length=50)
+
+# Lasso regression
+fit.lasso = glmnet(x,y, lambda = lambda.grid, alpha=1) # alpha=1 -> lasso
+plot(fit.lasso,xvar='lambda',label=TRUE, col = rainbow(dim(x)[2]))
+legend('topright', dimnames(x)[[2]], col = rainbow(dim(x)[2]), lty=1, cex=1)
+
+# Set lambda via CV
+cv.lasso = cv.glmnet(x,y,alpha=1,nfolds=3,lambda=lambda.grid)
+bestlam.lasso = cv.lasso$lambda.min
+bestlam.lasso
+
+plot(cv.lasso)
+abline(v=log(bestlam.lasso), lty=1)
+
+# Get the coefficients for the optimal lambda
+coef.lasso = predict(fit.lasso, s=bestlam.lasso, type = 'coefficients')[1:(p+1),]
+coef.lasso
+
+plot(fit.lasso,xvar='lambda',label=TRUE, col = rainbow(dim(x)[2]))
+abline(v=log(bestlam.lasso))
+
+# ------------------------------------------------------------------------------------
+# 7. Compare coefficients estimates for LS, Ridge and Lasso
+# ------------------------------------------------------------------------------------
+plot(rep(0, dim(x)[2]), coef(fm)[-1], col=rainbow(dim(x)[2]), pch=20,
+     xlim=c(-1,3), ylim=c(-1,2), xlab='', ylab=expression(beta),
+     axes=F)
+points(rep(1, dim(x)[2]), coef.ridge[-1], col=rainbow(dim(x)[2]), pch=20)
+points(rep(2, dim(x)[2]), coef.lasso[-1], col=rainbow(dim(x)[2]), pch=20)
+abline(h=0, col='grey41', lty=1)
+box()
+axis(2)
+axis(1, at=c(0,1,2), labels = c('LS', 'Ridge', 'Lasso'))
+legend('topright', dimnames(x)[[2]], col = rainbow(dim(x)[2]), pch=20, cex=1)

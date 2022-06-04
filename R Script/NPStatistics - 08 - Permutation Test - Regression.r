@@ -1,0 +1,171 @@
+###########################################################################################
+###                                  PERMUTATION TEST                                   ###
+###                                     Regression                                      ###
+###########################################################################################
+seed = 100
+B    = 1000
+
+### Model: Y = b0 + b1*X1 + b2*X2 + b3*X3 + epsilon
+data = iris[,1:4]    # data = [x1, x2, x3, y]
+x1   = data[,1]
+x2   = data[,2]
+x3   = data[,3]
+Y    = data[,4]
+n    = dim(data)[1]
+
+### ---------------------------------------------------------------------------------------
+### Parametric
+### ---------------------------------------------------------------------------------------
+param = lm(Y ~ x1 + x2 + x3)
+summary(param) 
+qqnorm(param$residuals)
+shapiro.test(param$residuals)
+
+### ---------------------------------------------------------------------------------------
+### Non Parametric
+### ---------------------------------------------------------------------------------------
+### |------------------------------------|
+### | Global test (H0: b1 = b2 = b3 = 0) |
+### |------------------------------------|
+fit_glob = lm(Y ~ x1 + x2 + x3)
+T0_glob  = summary(fit_glob)$f[1]
+
+# CMC to estimate the p-value
+set.seed(seed)
+T_glob_stat = numeric(B)
+for(k in 1:B){
+  perm           = sample(1:n)
+  Y_perm         = Y[perm]
+  T_glob_stat[k] = summary(lm(Y_perm ~ x1 + x2 + x3))$f[1]
+}
+
+# Permutational distribution of T
+par(mfrow=c(1,2))
+hist(T_glob_stat, xlim=range(c(T_glob_stat,T0_glob)), breaks=30)
+abline(v=T0_glob, col=3, lwd=2)
+plot(ecdf(T_glob_stat), xlim=range(c(T_glob_stat,T0_glob)))
+abline(v=T0_glob, col=3, lwd=2)
+
+# p-value
+p_value = sum(T_glob_stat>=T0_glob)/B
+p_value
+
+### |-------------------------|
+### | Test on x1 (H0: b1 = 0) |
+### |-------------------------|
+fit_glob = lm(Y ~ x1 + x2 + x3)
+T0_1     = abs(summary(fit_glob)$coefficients[2,3])
+fit_1_H0 = lm(Y ~ x2 + x3)
+res_1    = fit_1_H0$residuals
+
+# CMC to estimate the p-value
+set.seed(seed)
+T_1_stat = numeric(B)
+for(k in 1:B){
+  perm        = sample(1:n)
+  res_1_perm  = res_1[perm]
+  Y_perm      = fit_1_H0$fitted.values + res_1_perm
+  T_1_stat[k] = abs(summary(lm(Y_perm ~ x1 + x2 +x3))$coefficients[2,3])
+}
+
+# Permutational distribution of T
+par(mfrow=c(1,2))
+hist(T_1_stat, xlim=range(c(T_1_stat,T0_1)), breaks=30)
+abline(v=T0_1, col=3, lwd=2)
+plot(ecdf(T_1_stat), xlim=range(c(T_1_stat,T0_1)))
+abline(v=T0_1, col=3, lwd=2)
+
+# p-value
+p_value = sum(T_1_stat>=T0_1)/B
+p_value
+
+### |-------------------------|
+### | Test on x2 (H0: b2 = 0) |
+### |-------------------------|
+fit_glob = lm(Y ~ x1 + x2 + x3)
+T0_2     = abs(summary(fit_glob)$coefficients[3,3])
+fit_2_H0 = lm(Y ~ x1 + x3)
+res_2    = fit_2_H0$residuals
+
+# CMC to estimate the p-value
+set.seed(seed)
+T_2_stat = numeric(B)
+for(k in 1:B){
+  perm        = sample(1:n)
+  res_2_perm  = res_2[perm]
+  Y_perm      = fit_2_H0$fitted.values + res_2_perm
+  T_2_stat[k] = abs(summary(lm(Y_perm ~ x1 + x2 +x3))$coefficients[3,3])
+}
+
+# Permutational distribution of T
+par(mfrow=c(1,2))
+hist(T_2_stat, xlim=range(c(T_2_stat,T0_2)), breaks=30)
+abline(v=T0_2, col=3, lwd=2)
+plot(ecdf(T_2_stat), xlim=range(c(T_2_stat,T0_2)))
+abline(v=T0_2, col=3, lwd=2)
+
+# p-value
+p_value = sum(T_2_stat>=T0_2)/B
+p_value
+
+### |-------------------------|
+### | Test on x3 (H0: b3 = 0) |
+### |-------------------------|
+fit_glob = lm(Y ~ x1 + x2 + x3)
+T0_3     = abs(summary(fit_glob)$coefficients[4,3])
+fit_3_H0 = lm(Y ~ x1 + x2)
+res_3    = fit_3_H0$residuals
+
+# CMC to estimate the p-value
+set.seed(seed)
+T_3_stat = numeric(B)
+for(k in 1:B){
+  perm        = sample(1:n)
+  res_3_perm  = res_3[perm]
+  Y_perm      = fit_3_H0$fitted.values + res_3_perm
+  T_3_stat[k] = abs(summary(lm(Y_perm ~ x1 + x2 +x3))$coefficients[4,3])
+}
+
+# Permutational distribution of T
+par(mfrow=c(1,2))
+hist(T_3_stat, xlim=range(c(T_3_stat,T0_3)), breaks=30)
+abline(v=T0_3, col=3, lwd=2)
+plot(ecdf(T_3_stat), xlim=range(c(T_3_stat,T0_3)))
+abline(v=T0_3, col=3, lwd=2)
+
+# p-value
+p_value = sum(T_3_stat>=T0_3)/B
+p_value
+
+### |-------------------------| 
+### | Test on x3 (H0: b3 = c) |
+### |-------------------------|
+c        = 0.55
+fit_glob = lm(Y - c*x3 ~ x1 + x2 + x3)
+T0_3     = abs(summary(fit_glob)$coefficients[4,3])
+
+# Permutations of the residuals of the reduced model
+# Under H0: Y = b0 + b1*X1 + b2*X2 + c*X3
+fit_3_H0 = lm(Y - c*x3 ~ x1 + x2)
+res_3    = fit_3_H0$residuals
+
+# CMC to estimate the p-value
+set.seed(seed)
+T_3_stat = numeric(B)
+for(k in 1:B){
+  perm        = sample(1:n)
+  res_3_perm  = res_3[perm]
+  Y_perm      = fit_3_H0$fitted.values + res_3_perm + c*x3
+  T_3_stat[k] = abs(summary(lm(Y_perm - c*x3 ~ x1 + x2 +x3))$coefficients[4,3])
+}
+
+# Permutational distribution of T
+par(mfrow=c(1,2))
+hist(T_3_stat, xlim=range(c(T_3_stat,T0_3)), breaks=30)
+abline(v=T0_3, col=3, lwd=2)
+plot(ecdf(T_3_stat), xlim=range(c(T_3_stat,T0_3)))
+abline(v=T0_3, col=3, lwd=2)
+
+# p-value
+p_value = sum(T_3_stat>=T0_3)/B
+p_value

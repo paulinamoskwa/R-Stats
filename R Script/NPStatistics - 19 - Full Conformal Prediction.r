@@ -1,0 +1,165 @@
+###########################################################################################
+###                              FULL CONFORMAL PREDICTION                              ###
+###########################################################################################
+seed  = 100
+B     = 1000
+alpha = 0.1
+
+### ---------------------------------------------------------------------------------------
+### Univariate
+### ---------------------------------------------------------------------------------------
+parz    = read.table('parziali.txt')
+x       = parz$PI
+x_grid  = seq(min(x)-0.25*diff(range(x)), max(x)+0.25*diff(range(x)), length.out=100)
+p_value = numeric(length(x_grid))
+
+### |-------------------|
+### | Discrepancy-based |
+### |-------------------|
+NC = function(z_aug, i){
+  abs(z_aug[i] - mean(z_aug[-i]))
+  #abs(z_aug[i] - median(z.aug[-i]))  # more robust
+}
+
+for(k in 1:length(x_grid)){
+  x_aug  = c(x, x_grid[k])
+  scores = numeric(length(x_aug))
+  for(i in 1:length(scores)){
+    scores[i] = NC(x_aug, i)
+  }
+  p_value[k] = sum(scores>=scores[length(x_aug)])/(length(x_aug))
+}
+
+# Plot of the p-values
+plot(x_grid, p_value, type='l', ylim=c(0,1))
+abline(h=c(0,1))
+abline(h=alpha, col='red')
+points(x, numeric(length(x)), pch=3)
+
+# Prediction Interval
+PI_grid = x_grid[which(p_value>=alpha)]
+PI      = c(min(PI_grid), max(PI_grid))
+PI
+abline(v=PI, col='red')
+points(PI_grid, numeric(length(PI_grid)), pch=16, col='red')
+
+### |-----|
+### | KNN |
+### |-----|
+K  = 5
+NC = function(z_aug, i){
+  distances2 = (as.matrix(dist(z_aug))[i,-i])^2
+  mean(sort(distances2)[1:K])   # average linkage
+  #min(sort(distances2)[1:K])   # single linkage
+  #max(sort(distances2)[1:K])   # complete linkage
+}
+
+for(k in 1:length(x_grid)){
+  x_aug  = c(x, x_grid[k])
+  scores = numeric(length(x_aug))
+  for(i in 1:length(scores)){
+    scores[i] = NC(x_aug, i)
+  }
+  p_value[k] = sum(scores>=scores[length(x_aug)])/(length(x_aug))
+}
+
+# Plot of the p-values
+plot(x_grid, p_value, type='l', ylim=c(0,1))
+abline(h=c(0,1))
+abline(h=alpha, col='red')
+points(x, numeric(length(x)), pch=3)
+
+# Prediction Interval
+PI_grid = x_grid[which(p_value>=alpha)]
+PI      = c(min(PI_grid), max(PI_grid))
+PI
+abline(v=PI, col='red')
+points(PI_grid, numeric(length(PI_grid)), pch=16, col='red')
+
+### ---------------------------------------------------------------------------------------
+### Multivariate
+### ---------------------------------------------------------------------------------------
+data = read.table('parziali.txt')
+x    = data[,1]
+y    = data[,2]
+plot(x,y,asp=1)
+
+x_grid  = seq(min(x)-0.5*diff(range(x)), max(x)+0.5*diff(range(x)), length.out=10)
+y_grid  = seq(min(y)-0.5*diff(range(y)), max(y)+0.5*diff(range(y)), length.out=10)
+p_value = matrix(nrow=length(x_grid), ncol=length(y_grid))
+
+### |---------------------------|
+### | Predict a new (x,y) point |
+### |---------------------------|
+NC = function(z_aug, i){
+  sum((z_aug[i,]-colMeans(z_aug[-i,]))^2)   # Euclidean distance
+  #as.numeric(as.matrix(z_aug[i,]-colMeans(z_aug[-i,]))%*% solve(cov(z_aug[-i,])) %*%
+  #             as.matrix(t(z_aug[i,]-colMeans(z_aug[-i,]))))   # Mahalanobis
+}
+
+for(k in 1:length(x_grid)){
+  for(h in 1:length(y_grid)){
+    data_aug = rbind(data, c(x_grid[k], y_grid[h]))
+    scores   = numeric(dim(data_aug)[1])
+    for(i in 1:length(scores)){
+      scores[i] = NC(data_aug, i)
+    }
+    p_value[k,h] = sum(scores>=scores[dim(data_aug)[1]])/(dim(data_aug)[1])
+  }
+}
+
+# Plot of the p-value
+image(x_grid, y_grid, p_value, zlim=c(0,1), asp=1)
+points(data, pch=16)
+contour(x_grid, y_grid, p_value, levels=alpha, add=T)
+
+### |------------|
+### | Regression |
+### |------------|
+NC = function(z_aug, i){
+  abs(z_aug[i,2]-sum(coefficients(lm(z_aug[-i,2] ~ z_aug[-i,1]))*c(1, z_aug[i,1])))
+  # we can use anything, not only linear regression
+}
+
+for(k in 1:length(x_grid)){
+  for(h in 1:length(y_grid)){
+    data_aug = rbind(data, c(x_grid[k], y_grid[h]))
+    scores   = numeric(dim(data_aug)[1])
+    for(i in 1:length(scores)){
+      scores[i] = NC(data_aug, i)
+    }
+    p_value[k,h] = sum(scores>=scores[dim(data_aug)[1]])/(dim(data_aug)[1])
+  }
+}
+
+# Plot of the p-value
+image(x_grid, y_grid, p_value, zlim=c(0,1), asp=1)
+points(data, pch=16)
+contour(x_grid, y_grid, p_value, levels=alpha, add=T)
+
+### |-----|
+### | KNN |
+### |-----|
+K  = 5
+NC = function(z_aug, i){
+  distances2 = (as.matrix(dist(z_aug))[i,-i])^2
+  mean(sort(distances2)[1:K]) # average linkage
+  #min(sort(distances2)[1:K]) # single linkage
+  #max(sort(distances2)[1:K]) # complete linkage
+}
+
+for(k in 1:length(x_grid)){
+  for(h in 1:length(y_grid)){
+    data_aug = rbind(data, c(x_grid[k], y_grid[h]))
+    scores   = numeric(dim(data_aug)[1])
+    for(i in 1:length(scores)){
+      scores[i] = NC(data_aug, i)
+    }
+    p_value[k,h] = sum(scores>=scores[dim(data_aug)[1]])/(dim(data_aug)[1])
+  }
+}
+
+# Plot of the p-value
+image(x_grid, y_grid, p_value, zlim=c(0,1), asp=1)
+points(data, pch=16)
+contour(x_grid, y_grid, p_value, levels=alpha, add=T)

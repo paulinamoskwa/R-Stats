@@ -1,0 +1,52 @@
+###########################################################################################
+###                                      RANK TEST                                      ###
+###                                 Mann-Whitney U test                                 ###
+###########################################################################################
+seed = 100
+B    = 1000
+
+### ---------------------------------------------------------------------------------------
+### Two samples
+### ---------------------------------------------------------------------------------------
+### Two-sided test
+###    H0: P(data_1 > data_2)  = 0.5
+###    H1: P(data_1 > data_2) != 0.5
+data_1    = cars$speed             
+data_2    = cars$dist              
+data_pool = c(data_1, data_2)
+n1        = length(data_1)
+n2        = length(data_2)
+n         = n1 + n2
+ranks     = rank(data_pool)
+
+R1 = sum(ranks[1:length(data_1)])
+R2 = sum(ranks[(length(data_1)+1):length(ranks)])
+U1 = R1 - n1*(n1+1)/2
+U2 = R2 - n2*(n2+1)/2
+
+# MC computation of the p-value
+set.seed(seed)
+U1.sim = numeric(B)
+U2.sim = numeric(B)
+for (k in 1:B){
+  ranks.temp = sample(1:n)
+  R1.temp    = sum(ranks.temp[1:n1])
+  R2.temp    = sum(ranks.temp[(n1+1):(n1+n2)])
+  U1.temp    = R1.temp - n1*(n1+1)/2
+  U2.temp    = R2.temp - n2*(n2+1)/2
+  U1.sim[k]  = U1.temp
+  U2.sim[k]  = U2.temp
+}
+
+par(mfrow=c(2,1))
+hist(U1.sim, xlim=c(0,n1*n2))
+abline(v=c(U1,U2), col='red')
+abline(v=n1*n2/2, lwd=3)
+
+hist(U2.sim, xlim=c(0,n1*n2))
+abline(v=c(U1,U2), col='red')
+abline(v=n1*n2/2, lwd=3)
+
+U.star  = max(U1, U2)
+p_value = 2 * sum(U1.sim >= U.star)/B
+p_value
