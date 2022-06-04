@@ -3,12 +3,12 @@
 ## 📖 **About**
 This repository comes as a rearrangement of all the work done during my MSc in Mathematical Engineering @ Politecnico di Milano. The purpose of the repository is to put at reach an easy-to-use collection of statistical methods and techniques. Out of scope, on the other hand, is to address all the problems that these methods and techniques may encounter in a real-world data contest. In fact, all the datasets used are toy datasets, used only to introduce an application.
 
-🟥 All the code is written in `R`.<br>
+All the code is written in `R`.<br>
 A `python` correspondent will also exist in the future.
 
 Mainly, the collection is divided into two sections:
-* **Standard Statistics**: parametric statistics, classical approaches with, often, strong assumptions on data
-* **Nonparametric Statistics**: modern approaches, free from heavy assumptions on data
+* *Standard Statistics* - parametric statistics, classical approaches with, often, strong assumptions on data
+* *Nonparametric Statistics* - modern approaches, free from heavy assumptions on data
 
 I uploaded the files in `.r` (script version, easy to download and use directly with a custom dataset), in `.rmd` and in `.html` (for visualization purposes). Since GitHub does not provide a preview for `.rmd` (nor `.html`), I made use of an extension that allows the viewing of `.html`. 
 
